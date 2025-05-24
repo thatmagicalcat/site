@@ -1,0 +1,135 @@
+---
+import Inquery from "../components/Inquery.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Home" navBar={false}>
+	<main>
+		<h1>Rehmatpal Singh</h1>
+		<p>
+			Tryna be <a href="https://github.com/DuskyElf/duskyelf.me/commit/f7c9ae5a6a023a79883905abd2f6aebdb2725ba5" class="correction-a">^</a> Software Engineer for the
+			<Inquery href="#" question="What good?">Good</Inquery>
+		</p>
+		<ul class="icons">
+			<li>
+				<a href="https://github.com/DuskyElf">
+					<img src="/assets/icons/github.svg" alt="GitHub Icon" />
+				</a>
+			</li>
+			<li>
+				<a href="https://bsky.app/profile/duskyelf.me">
+					<img src="/assets/icons/bluesky.svg" alt="Bluesky Icon" />
+				</a>
+			</li>
+			<li>
+				<a href="https://www.youtube.com/@DuskyDaily">
+					<img src="/assets/icons/youtube.svg" alt="YouTube Icon" />
+				</a>
+			</li>
+			<li>
+				<Inquery href="/blog" question="Read my blog">
+					<img src="/assets/icons/blog.svg" alt="Blog Icon" />
+				</Inquery>
+			</li>
+		</ul>
+	</main>
+</BaseLayout>
+
+<style>
+	main {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-direction: column;
+
+		height: 90vh;
+		padding: 20px;
+		text-align: center;
+	}
+
+	p {
+		position: relative;
+	}
+
+	.correction-a {
+		color: inherit;
+		text-decoration: none;
+
+		top: 0.7em;
+		position: relative;
+	}
+
+	.correction-a::before {
+		content: "a";
+
+		top: -1.8em;
+		position: absolute;
+	}
+
+	.correction-a::after {
+		opacity: 0;
+		font-size: 0.5em;
+		text-decoration: underline;
+		content: "english is hard";
+
+		left: 0;
+		bottom: -2em;
+		position: absolute;
+	}
+
+	.correction-a:hover::after {
+		opacity: 1;
+	}
+
+	h1 {
+		transform: translateY(0.5rem);
+		font-size: min(7rem, 12vw);
+		text-shadow: 1px 1px 15px color-mix(in srgb, white, transparent 50%);
+	}
+
+	p {
+		font-size: max(1rem, min(2rem, 3.5vw));
+	}
+
+	.icons {
+		gap: 1rem;
+		display: flex;
+		list-style: none;
+
+		margin: 30px 0;
+	}
+
+	.icons img {
+		cursor: pointer;
+
+		opacity: 0.7;
+		width: 1.5rem;
+		height: 1.5rem;
+		transition: opacity 0.3s;
+	}
+
+	.icons img:hover {
+		opacity: 1;
+	}
+
+	.icons img[alt="YouTube Icon"] {
+		scale: 1.2;
+	}
+
+	.icons img[alt="GitHub Icon"] {
+		filter: invert(1);
+	}
+
+	:root:has(#theme-light:checked) .icons img[alt="GitHub Icon"] {
+		filter: invert(0);
+	}
+
+	.icons img[alt="Blog Icon"] {
+		filter: invert(1);
+		transform: translateY(-0.1rem);
+	}
+
+	:root:has(#theme-light:checked) .icons img[alt="Blog Icon"] {
+		filter: invert(0);
+	}
+</style>
