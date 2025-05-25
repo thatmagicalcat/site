@@ -1,0 +1,253 @@
+---
+layout: '../../layouts/BlogLayout.astro'
+
+title: "Abusing rust's type system"
+pubDate: 2025-05-25
+description: 'read da title'
+
+tags: ["rust", "type system", "recursion"]
+---
+
+# Introduction
+In this blog, I will tell you about all the type system tricks I know and how I encorporated all those tricks into https://github.com/thatmagicalcat/tcrts.
+
+## The Goal
+Lol it's fairly obvious, we'll abuse rust's type system what else?
+
+## The Plan
+The most important thing for abusing the type system is to have a good understanding of recursion.
+We are going to use recursion to create a set of types that can be used to represent a set of values, datastructure like list, tuple, etc. 
+
+## The Basics
+Let's start with the numbers, we are going to represent the numbers using types.
+Let's start with the number zero.
+```rust
+struct Zero;
+```
+
+No we aren't going to create a struct for every number, that would be stupid.
+Instead, we are going to use a recursive type to represent the numbers.
+
+What I mean is, for 1 can be written as 0 + 1, 2 can be written as 0 + 1 + 1, and so on.
+
+```rust
+// we'll have to use PhantomData marker as
+// we are not going to use the generic type T
+struct Next<T>(std::marker::PhantomData<T>);
+```
+
+And now we can represent the numbers as follows:
+```rust
+type One = Next<Zero>;
+type Two = Next<One>;
+type Three = Next<Two>;
+// and so on
+```
+
+Currently the `Next<T>` and Zero type are kinda separate type, we's define a trait called `Num` to unify them, this crate won't do anything but it'll help us with the implementation of traits.
+```rust
+trait Num {}
+
+// and implement the trait for both types
+impl Num for Zero {}
+impl<T: Num> Num for Next<T> {}
+
+// We're also gonna change the `Next` struct's
+// definition to include the `Num` trait bound
+struct Next<T: Num>(std::marker::PhantomData<T>);
+```
+
+Ok but let's say we have a very long type chain, for example `Next<Next<Next<..Next<Zero>..>>>`, how do we get the actual value from this type?
+Surely we are not going to count the number of `Next` types manually. For checking the value of the type, let's define a trait called `ToVal` 
+that will convert the type to a value which we can print.
+```rust
+trait ToVal {
+    const VALUE: usize;
+}
+```
+
+Yup you guessed it, it is going to be a recursive definition.
+In any recursive definition, we need a base case, and this implementation the base case is `Zero`.
+```rust
+impl ToVal for Zero {
+    const VALUE: usize = 0;
+}
+```
+
+And now we can implement the `ToVal` trait for `Next<T>` as follows:
+```rust
+impl<N: ToVal> ToVal for Next<N> {
+    const VALUE: usize = 1 + N::VALUE;
+}
+```
+
+We can test that this works by running the following code:
+```rust
+fn main() {
+    type One = Next<Zero>;
+    type Two = Next<One>;
+    type Three = Next<Two>;
+
+    assert_eq!(One::VALUE, 1);
+    assert_eq!(Two::VALUE, 2);
+    assert_eq!(Three::VALUE, 3);
+}
+```
+
+And it works! Now we're done with the basics, let's move on to the next part and define some operations which we can perform on these number types.
+
+## Arithmetic operations
+For our arithmetic operations, we are going to use [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms), which are a set of axioms for the natural numbers that can be used to define operations like about addition, subtraction and multiplication in a recursive way.
+
+### Addition
+Before jumping into the type system implementation, let's define the addition operation using the Peano Axioms.
+The addition operation is defined as follows:
+
+Let's define a function `S(x) = x + 1` (this is our `Next` struct from above).
+
+Our base cases are going to be:
+```
+a + 0 = a                  - [1]
+a + S(b) = S(a + b)        - [2]
+```
+Which is fairly obvious, as addition is commutative, that means, a + (b + 1) is same as (a + b) + 1. We did the same thing above.
+
+Let's try to create a recursive definition for simple examples first:
+```
+a + 1 = a + S(0)
+      = S(a + 0)        using [2]
+      = S(a)            using the base case [1]
+
+a + 1 = S(a)            - [3] 
+
+
+a + 2 = a + S(1)
+      = S(a + 1)        using [2]
+      = S(S(a))         using [3]
+
+a + 2 = S(S(a))         - [4]
+
+
+a + 3 = a + S(2)
+      = S(a + 2)        using [2]
+      = S(S(S(a)))      using [4]
+
+a + 3 = S(S(S(a)))      - [5]
+```
+
+Now we can see a pattern here, we can generalize this for `a + n` as follows:
+```
+a + n = S(a + S(n - 1))
+      = S(S(S(...S(a)...)))  where S is applied n times
+```
+
+With that understanding, we're ready to implement the addition operation in Rust's type system.
+Let's start by defining a trait called `PeanoAdd` that will represent the addition operation.
+```rust
+trait PeanoAdd<Rhs: Num> {
+    type Output: Num;
+}
+```
+
+Base case:
+```rust
+// N + 0 = N
+impl<N: Num> PeanoAdd<Zero> for N {
+    type Output = N;
+}
+```
+
+Next, we generalize the addition operation for `Next<T>` as follows:
+```rust
+// N + Next<M> = Next<N + Next<M - 1>>
+impl<N, M> PeanoAdd<Next<M>> for N
+where
+    N: Num + PeanoAdd<M>,
+    M: Num,
+{ 
+    type Output = Next<<N as PeanoAdd<M>>::Output>;
+}
+```
+Notice that we're doing `<N as PeanoAdd<M>>` but out trait is `PeanoAdd<Next<M>>` what this means is we're basically doing `M - 1`, which we can't do directly in Rust system
+
+We can test our addition operation by running the following code:
+```rust
+type _0 = Zero;
+type _1 = Next<_0>;
+type _2 = Next<_1>;
+type _3 = Next<_2>;
+type _4 = Next<_3>;
+type _5 = Next<_4>;
+type _6 = Next<_5>;
+type _7 = Next<_6>;
+type _8 = Next<_7>;
+type _9 = Next<_8>;
+
+fn main() {
+    assert_eq!(<_5 as PeanoAdd<_6>>::Output::VALUE, _9::VALUE);
+
+    // Remember `::VALUE` comes from the `ToValue` trait
+}
+```
+
+If you're wondering how this recursive definition will actually work, I've got you covered.
+
+> Let's say we have two numbers
+> ```rust
+> type A = Next<Next<Next< ... Zero ... >>> // Next<...> applied A times
+> type B = Next<Next<Next< ... Zero ... >>> // Next<...> applied B times
+> ```
+> 
+> Now our addition will look like this
+> ```rust
+> type Result = <A as PeanoAdd<B>>::Output;
+> ```
+> 
+> I'll use a notation to simplify the type chain
+> `Next<Next<Next<Zero>>> - 1` will be equivalent to `Next<Next<Zero>>`
+> 
+> Ok we're ready to expand our addition operation step by step.
+> ```rust
+> <A as PeanoAdd<B>>::Output = Next<A as PeanoAdd<B - 1>>
+> <A as Add<Next<B - 1>>::Output = Next<A as Add<Next<B - 2>>>
+> <A as Add<Next<B - 2>>::Output = Next<A as Add<Next<B - 3>>>
+> <A as Add<Next<B - 3>>::Output = Next<A as Add<Next<B - 4>>>
+>    .
+>    . repeated B times
+>    .
+> <A as Add<Next<Zero>>::Output = Next<A as Add<Zero>>
+> <A as Add<Zero>>::Output = Next<A as Add<Zero>>
+> // this is our base case, and we can see that
+> // <N as Add<Zero>>::Output = N
+> <A as Add<Next<Zero>>::Output = A
+> 
+> // now when you unwind the stack, you get
+> <A as Add<Next<One>>::Output = Next<A>
+> <A as Add<Next<Two>>::Output = Next<Next<A>>
+> <A as Add<Next<Three>>::Output = Next<Next<Next<A>>>
+>    .
+>    . repeated B times
+>    .
+> <A as Add<Next<B - 1>>::Output = Next<Next<Next<... A ...>
+>                                      ^^^^^^^^^^^^^^^^^^^^^
+>                                      |
+>                              applied B times
+> 
+> // and finally we get
+> <A as Add<B>::Output = Next<Next<Next<... A ...>
+> ```
+
+You can skip the above explanation if you understand the mathematical definition of addition that we defined above, but I think it is important to understand how the recursion works in Rust's type system.
+And you should be able to dry run the type system code in your head because that's the only way to debug your code.
+
+> **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
+> - [ ] subtraction
+> - [ ] multiplication
+> - [ ] macros to make life easier
+> - [ ] comparison
+> - [ ] boolean logic
+> - [ ] lists
+> - [ ] list operations (append, index, length, etc.)
+> - [ ] type level functions
+> - [ ] more list operations (map, filter, fold, etc.)
+> - [ ] conditionals
