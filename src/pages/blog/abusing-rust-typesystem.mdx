@@ -8,7 +8,7 @@ description: 'read da title'
 tags: ["rust", "type system", "recursion"]
 ---
 
-# Introduction
+## Introduction
 In this blog, I will tell you about all the type system tricks I know and how I encorporated all those tricks into https://github.com/thatmagicalcat/tcrts.
 
 ## The Goal
@@ -388,8 +388,6 @@ Ok this is going to be easy, try to implement boolean and boolean operations you
 Trait and structs:
 ```rust
 trait Boolean {
-    // will be helpful when implementing
-    // binary operations
     type Value: Num, 
 }
 
@@ -600,6 +598,44 @@ where
 ```
 
 > ### Greater than, Greater than or equal to
+Now, one way to implement these next two operations, we can everything again what we did for the previous, but we're smart.
+
+Notice that `x > y` is literally `!(x <= y)` <br/>
+and similarly `x >= y` is `!(x < y)`, I think I will use this, but feel free to go with any of the implementation.
+
+Greater than
+```rust
+pub trait PeanoGt<N> {
+    type Output: Boolean;
+}
+
+impl<M, N> PeanoGt<M> for N
+where
+    N: Num + PeanoLt<M> + PeanoEq<M>,
+    M: Num,
+    <N as PeanoLt<M>>::Output: Or<<N as PeanoEq<M>>::Output>,
+    <<N as PeanoLt<M>>::Output as Or<<N as PeanoEq<M>>::Output>>::Output: Not,
+{
+    type Output = <<N as PeanoLEq<M>>::Output as Not>::Output;
+}
+```
+
+Greater than or equal to
+```rust
+trait PeanoGEq<N> {
+    type Output: Boolean;
+}
+
+impl<N, M> PeanoGEq<M> for N
+where
+    N: Num + PeanoLt<M> + PeanoEq<M>,
+    M: Num,
+    <N as PeanoLt<M>>::Output: Or<<N as PeanoEq<M>>::Output>,
+    <N as PeanoLt<M>>::Output: Not,
+{
+    type Output = <<N as PeanoLt<M>>::Output as Not>::Output;
+}
+```
 
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
 > - [x] arithmetic
@@ -607,7 +643,7 @@ where
 >   - [x] subtraction
 >   - [x] multiplication
 > - [x] boolean operations
-> - [ ] comparison
+> - [x] comparison
 > - [ ] lists
 > - [ ] list operations (append, index, length, remove, etc.)
 > - [ ] type level functions
