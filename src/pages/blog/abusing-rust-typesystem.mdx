@@ -107,38 +107,49 @@ The addition operation is defined as follows:
 Let's define a function `S(x) = x + 1` (this is our `Next` struct from above).
 
 Our base cases are going to be:
+```math
+a + 0 = a \tag{1}
 ```
-a + 0 = a                  - [1]
-a + S(b) = S(a + b)        - [2]
+```math
+a + S(b) = S(a + b)        \tag{2}
 ```
 Which is fairly obvious, as addition is commutative, that means, a + (b + 1) is same as (a + b) + 1. We did the same thing above.
 
 Let's try to create a recursive definition for simple examples first:
+```math
+\begin{align*}
+a + 1 &= a + S(0) \\
+      &= S(a + 0) &\text{using (1)} \\
+      &= S(a) &\text{using (2)} \\
+
+a + 1 &= S(a) \tag{3}
+\end{align*}
 ```
-a + 1 = a + S(0)
-      = S(a + 0)        using [2]
-      = S(a)            using the base case [1]
 
-a + 1 = S(a)            - [3] 
+```math
+\begin{align*}
+a + 2 &= a + S(1) \\
+      &= S(a + 1) &\text{using (2)} \\
+      &= S(S(a)) &\text{using (3)} \\
+a + 2 &= S(S(a))         \tag{4}
+\end{align*}
 
-
-a + 2 = a + S(1)
-      = S(a + 1)        using [2]
-      = S(S(a))         using [3]
-
-a + 2 = S(S(a))         - [4]
-
-a + 3 = a + S(2)
-      = S(a + 2)        using [2]
-      = S(S(S(a)))      using [4]
-
-a + 3 = S(S(S(a)))      - [5]
+```
+```math
+\begin{align*}
+a + 3 &= a + S(2) \\
+      &= S(a + 2) &\text{using (2)} \\
+      &= S(S(S(a))) &\text{using (4)} \\
+a + 3 &= S(S(S(a))) \tag{5}
+\end{align*}
 ```
 
 Now we can see a pattern here, we can generalize this for `a + n` as follows:
-```
-a + n = S(a + S(n - 1))
-      = S(S(S(...S(a)...)))  where S is applied n times
+```math
+\begin{align*}
+a + n &= S(a + S(n - 1)) \\
+      &= S(S(S(...S(a)...))) \\   &\text{where }S\text{ is applied }n\text{ times} \\
+\end{align*}
 ```
 
 With that understanding, we're ready to implement the addition operation in Rust's type system.
@@ -244,14 +255,16 @@ we'll keep subtracting 1 from both of the terms until one of them becomes 0.
 Here's what i mean:
 Let's take an example of `5 - 3`
 
-```
+```math
+\begin{align*}
 5 - 3
- = S(S(S(S(S(0))))) - S(S(S(0)))
- = S(S(S(S(0)))) - S(S(0))
- = S(S(S(0))) - S(0)
- = S(S(0)) - 0
- = S(S(0))
- = 2
+ &= S(S(S(S(S(0))))) - S(S(S(0))) \\
+ &= S(S(S(S(0)))) - S(S(0)) \\
+ &= S(S(S(0))) - S(0) \\
+ &= S(S(0)) - 0 \\
+ &= S(S(0)) \\
+ &= 2 \\
+\end{align*}
 ```
 
 As you can see we're basically removing the `S` function from both terms until the right term becomes `0`, and if we reach `0` for left term first, we'll have a negative number which is a problem as we don't really have a way to deal with.
@@ -290,11 +303,79 @@ where
 You can see the similarity, the implementation is defined on `Next<M>` and `Next<N>`, so using `N` and `M` in the recurive definition is same as converting `S(a) -> a`.
 
 > ### Multiplication
-Multiplication is kinda the hardest thing to figure, it took me a while to write a recursive definition that would work with rust's type system, here it is:
+Multiplication is kinda the hardest thing to figure, it took me a while to come up with a recursive definition that would work with rust's type system, here it is:
+
+Here's the definition
+```math
+\begin{align*}
+a \times n &= a + (a \times (n - 1))  \tag{6} \\
+a \times 0 &= 0\\
+\end{align*}
+```
+
+Here's how it looks like:
+```math
+\begin{align*}
+a \times b       &= a + (a \times (b - 1)) \\
+a \times (b - 1) &= a + (a \times (b - 2)) \\
+a \times (b - 2) &= a + (a \times (b - 3)) \\
+a \times (b - 3) &= a + (a \times (b - 4)) \\
+&\vdots\\
+a \times 3 &= a + (a \times 2) \\
+a \times 2 &= a + (a \times 1) \\
+a \times 1 &= a + (a \times 0) \\
+a \times 0 &= 0 \\
+\end{align*}
+```
+
+Now we unwind the stack
+
+```math
+\begin{align*}
+a \times 1 &= a \\
+a \times 2 &= a + a \\
+a \times 3 &= a + a + a \\
+a \times 4 &= a + a + a + a \\
+a \times b &= \underbrace{a + a + \dots + a + a}_{b\text{ terms}} \\
+\end{align*}
+```
+
+Now let's implement multiplication in rust
+
+The trait:
+```rust
+trait PeanoMul<N: Num> {
+    type Output: Num;
+}
+```
+
+Base case:
+```rust
+// N * 0 = 0
+impl<N: Num> PeanoMul<Zero> for N {
+    type Output = Zero;
+}
+```
+
+Recursive definition:
+```rust
+impl<N, M> PeanoMul<Next<M>> for N
+where
+    N: Num + PeanoMul<M> + PeanoAdd<<N as PeanoMul<M>>::Output>,
+    M: Num,
+    <N as PeanoMul<M>>::Output: Num,
+{
+    type Output = <
+        N as PeanoAdd< // N +
+            <N as PeanoMul<M> // N * (M - 1)
+        >::Output>
+    >::Output;
+}
+```
 
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
 > - [x] subtraction
-> - [ ] multiplication
+> - [x] multiplication
 > - [ ] macros to make life easier
 > - [ ] comparison
 > - [ ] boolean logic
