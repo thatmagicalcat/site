@@ -44,7 +44,8 @@ type Three = Next<Two>;
 // and so on
 ```
 
-Currently the `Next<T>` and Zero type are kinda separate type, we's define a trait called `Num` to unify them, this crate won't do anything but it'll help us with the implementation of traits.
+Currently the `Next<T>` and `Zero` are two separate structs, we'll define a trait called `Num` to unify them, this crate won't do anything but it'll help us with the implementation of traits.
+
 ```rust
 trait Num {}
 
@@ -97,9 +98,9 @@ fn main() {
 And it works! Now we're done with the basics, let's move on to the next part and define some operations which we can perform on these number types.
 
 ## Arithmetic operations
-For our arithmetic operations, we are going to use [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms), which are a set of axioms for the natural numbers that can be used to define operations like about addition, subtraction and multiplication in a recursive way.
+For our arithmetic operations, we are going to use [Peano Axioms](https://en.wikipedia.org/wiki/Peano_axioms), which are a set of axioms for the natural numbers that can be used to define operations like addition, subtraction and multiplication in a recursive way.
 
-### Addition
+> ### Addition
 Before jumping into the type system implementation, let's define the addition operation using the Peano Axioms.
 The addition operation is defined as follows:
 
@@ -126,7 +127,6 @@ a + 2 = a + S(1)
       = S(S(a))         using [3]
 
 a + 2 = S(S(a))         - [4]
-
 
 a + 3 = a + S(2)
       = S(a + 2)        using [2]
@@ -217,9 +217,7 @@ If you're wondering how this recursive definition will actually work, I've got y
 >    .
 > <A as Add<Next<Zero>>::Output = Next<A as Add<Zero>>
 > <A as Add<Zero>>::Output = Next<A as Add<Zero>>
-> // this is our base case, and we can see that
-> // <N as Add<Zero>>::Output = N
-> <A as Add<Next<Zero>>::Output = A
+> // this is our base case, its value is A itself
 > 
 > // now when you unwind the stack, you get
 > <A as Add<Next<One>>::Output = Next<A>
@@ -240,8 +238,62 @@ If you're wondering how this recursive definition will actually work, I've got y
 You can skip the above explanation if you understand the mathematical definition of addition that we defined above, but I think it is important to understand how the recursion works in Rust's type system.
 And you should be able to dry run the type system code in your head because that's the only way to debug your code.
 
+> ### Subtraction
+Subtraction kinda the same as addition but instead of adding 1,
+we'll keep subtracting 1 from both of the terms until one of them becomes 0.
+Here's what i mean:
+Let's take an example of `5 - 3`
+
+```
+5 - 3
+ = S(S(S(S(S(0))))) - S(S(S(0)))
+ = S(S(S(S(0)))) - S(S(0))
+ = S(S(S(0))) - S(0)
+ = S(S(0)) - 0
+ = S(S(0))
+ = 2
+```
+
+As you can see we're basically removing the `S` function from both terms until the right term becomes `0`, and if we reach `0` for left term first, we'll have a negative number which is a problem as we don't really have a way to deal with.
+
+Since the I already the explained the concept above, i'll jump straight into the code:
+
+
+The trait:
+```rust
+trait PeanoSub<N: Num> {
+    type Output: Num;
+}
+```
+
+
+Base case
+```rust
+// N - 0 = N
+impl<N: Num> PeanoSub<Zero> for N {
+    type Output = N;
+}
+```
+
+Recursive definition:
+```rust
+// Next<N> - Next<M> = N - M
+impl<N, M> PeanoSub<Next<M>> for Next<N>
+where
+    N: Num + PeanoSub<M>,
+    M: Num,
+{
+    type Output = <N as PeanoSub<M>>::Output;
+}
+```
+
+You can see the similarity, the implementation is defined on `Next<M>` and `Next<N>`, so using `N` and `M` in the recurive definition is same as converting `S(a) -> a`.
+
+> ### Multiplication
+Multiplication is kinda the hardest thing to figure, it took me a while to write a recursive definition that would work with rust's type system, here it is:
+
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
-> - [ ] subtraction
+> - [x] subtraction
 > - [ ] multiplication
 > - [ ] macros to make life easier
 > - [ ] comparison
