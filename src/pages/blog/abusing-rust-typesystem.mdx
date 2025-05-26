@@ -373,14 +373,180 @@ where
 }
 ```
 
+And now we can use it like the following:
+```rust
+fn main() {
+    type Product = <_3 as PeanoMul<_3>>::Output;
+
+    assert_eq!(Product::VALUE, _9::VALUE);
+}
+```
+
+## Boolean types
+Ok this is going to be easy, try to implement boolean and boolean operations yourself.
+
+Trait and structs:
+```rust
+trait Boolean {
+    // will be helpful when implementing
+    // binary operations
+    type Value: Num, 
+}
+
+struct True;
+struct False
+```
+
+Implementations
+```rust
+impl Boolean for True {
+    type Value = Next<Zero>;
+}
+
+impl Boolean for False {
+    type Value = Zero;
+}
+
+impl<B> ToVal for b
+where
+    B: Boolean,
+    B::Value: ToVal
+{
+    const VALUE: usize = B::Value::VALUE;
+}
+```
+
+The implementaiton of binary operations is kinda self explanatory so I guess I'll just drop the rust code.
+
+I am implement the operations in a very simple way because otherwise I'll have to add type contrains, as an exercise, try to implement NAND gate and then define all other binary operations using that.
+
+> ### NOT
+```rust
+trait Not {
+    type Output: Boolean;
+}
+
+impl Not for True  { type Output = False; }
+impl Not for False { type Output = True;  }
+```
+
+> ### AND
+```rust
+trait And<B: Boolean> {
+    type Output: Boolean;
+}
+
+impl And<False> for False { type Output = False; }
+impl And<True>  for False { type Output = False; }
+impl And<False> for True  { type Output = False; }
+impl And<True>  for True  { type Output = True;  }
+```
+
+> ### OR
+```rust
+trait Or<B: Boolean> {
+    type Output: Boolean;
+}
+
+impl Or<False> for False { type Output = False; }
+impl Or<True>  for False { type Output = True;  }
+impl Or<False> for True  { type Output = True;  }
+impl Or<True>  for True  { type Output = True;  }
+```
+
+> ### XOR
+```rust
+trait Xor<B: Boolean> {
+    type Output: Boolean;
+}
+
+impl Xor<False> for False { type Output = False; }
+impl Xor<True>  for True  { type Output = False; }
+impl Xor<False> for True  { type Output = True;  }
+impl Xor<True>  for False { type Output = True;  }
+```
+
+> ### NAND
+```rust
+trait NAnd<B: Boolean> {
+    type Output: Boolean;
+}
+
+impl NAnd<False> for False { type Output = True;  }
+impl NAnd<True>  for False { type Output = True;  }
+impl NAnd<False> for True  { type Output = True;  }
+impl NAnd<True>  for True  { type Output = False; }
+```
+
+## Comparisons
+
+> ### Equality
+Let `Eq` be a function defined recursively by:
+```math
+\begin{align*}
+Eq(0, 0) &= \text{true} \\
+Eq(S(a), 0) &= \text{false} \\
+Eq(0, S(b)) &= \text{false} \\
+Eq(S(a), S(b)) &= Eq(a, b) \\
+\end{align*}
+```
+
+Now we just have to translate this logic to our rust code:
+```rust
+trait PeanoEq<N> {
+    type Output: Boolean;
+}
+
+// Eq(a, 0) = false
+impl<N: Num> PeanoEq<Zero> for Next<N> {
+    type Output = False;
+}
+
+// Eq(0, a) = false
+impl<N: Num> PeanoEq<Next<N>> for Zero {
+    type Output = False;
+}
+
+// Eq(0, 0) = true
+impl PeanoEq<Zero> for Zero {
+    type Output = True;
+}
+
+// Eq(S(a), S(b)) = Eq(a, b)
+impl<N, M> PeanoEq<Next<M>> for Next<N>
+where
+    N: Num + PeanoEq<M>,
+    M: Num,
+{
+    type Output = <N as PeanoEq<M>>::Output;
+}
+```
+
+And with that, we can also define our `PeanoNEq` as follows:
+```rust
+trait PeanoNEq<N> {
+    type Output: Boolean;
+}
+
+impl<N: Num, M: Num> PeanoNEq<N> for M
+where
+    N: PeanoEq<M>,
+    <N as PeanoEq<M>>::Output: Not,
+{
+    type Output = <<N as PeanoEq<M>>::Output as Not>::Output;
+}
+```
+
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
-> - [x] subtraction
-> - [x] multiplication
-> - [ ] macros to make life easier
+> - [x] arithmetic
+>   - [x] addition
+>   - [x] subtraction
+>   - [x] multiplication
+> - [x] boolean operations
 > - [ ] comparison
-> - [ ] boolean logic
 > - [ ] lists
-> - [ ] list operations (append, index, length, etc.)
+> - [ ] list operations (append, index, length, remove, etc.)
 > - [ ] type level functions
-> - [ ] more list operations (map, filter, fold, etc.)
+> - [ ] more list operations (map, filter, etc.)
+> - [ ] macros to make life easier
 > - [ ] conditionals
