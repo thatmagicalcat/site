@@ -152,6 +152,24 @@ a + n &= S(a + S(n - 1)) \\
 \end{align*}
 ```
 
+Here's another example to help you understand, let's try to use our recursive definition to find 10 + 4
+```math
+\begin{align*}
+10 + 4 &= 10 + S(3) \\
+&= S(10 + 3) \\
+&= S(10 + S(2)) \\
+&= S(10 + 2) \\
+&= S(S(10 + 2)) \\
+&= S(S(10 + S(1))) \\
+&= S(S(S(10 + 1))) \\
+&= S(S(S(10 + S(0)))) \\
+&= S(S(S(S(10 + 0)))) \\
+&= S(S(S(S(10)))) \\
+&= 10 + 1 + 1 + 1 + 1 \\
+&= 14
+\end{align*}
+```
+
 With that understanding, we're ready to implement the addition operation in Rust's type system.
 Let's start by defining a trait called `PeanoAdd` that will represent the addition operation.
 ```rust
@@ -336,11 +354,25 @@ a \times 1 &= a \\
 a \times 2 &= a + a \\
 a \times 3 &= a + a + a \\
 a \times 4 &= a + a + a + a \\
+&\vdots \\
 a \times b &= \underbrace{a + a + \dots + a + a}_{b\text{ terms}} \\
 \end{align*}
 ```
 
-Now let's implement multiplication in rust
+Here's an example, let's try to calculate `5 * 6`
+```math
+\begin{align*}
+5 \times 6 &= 5 + (5\times 5) \\
+&= 5 + 5 + (5\times 4) \\
+&= 5 + 5 + 5 + (5\times 3 ) \\
+&= 5 + 5 + 5 + 5 + 5 (\times 2 ) \\
+&= 5 + 5 + 5 + 5 + 5 + 5 (\times 1) \\
+&= 5 + 5 + 5 + 5 + 5 + 5 \\
+&= 30
+\end{align*}
+```
+
+Now let's implement this in rust
 
 The trait:
 ```rust
@@ -637,6 +669,119 @@ where
 }
 ```
 
+## Lists
+I think you've already guessed we're basically doing functional programming, we don't have loops and everything is immutable.
+
+For implementing a list we're going to use something called a cons list. It is a specific type of linked list often used to when immutability is desired.
+It is built recursively, meaning each *cons* node contains the next node.
+
+A simple list of numbers such as `[2, 4, 6, 8]` will look like `Cons(2, Cons(4, Cons(6, Cons(8, nil))))` in a cons list.
+Clearly, we have to define two structs, one is the `Cons` itself and other is `Nil` which will denote the end of the list.
+```rust
+struct Cons<H, T>(std::marker::PhantomData<(H, T)>);
+struct Nil;
+```
+
+We will also create a `List` create to unify them
+```rust
+trait List {}
+
+impl<H, T> List for Cons<H, T> {}
+impl List for Nil {}
+```
+
+And just like that! now we have a list, we can use it like this:
+```rust
+fn main() {
+    type List = Cons<_2, Cons<_4, Cons<_6, Cons<_8, Nil>>>>;
+}
+```
+
+But this list alone is not particularly useful, we've to implement some operations...
+
+## List operations
+
+> ### Index
+Starting from the most basic list operation, we have indexing.
+And yes you guessed it, this will also be a recursive definition.
+
+Let us define a function `Idx(list, index)` as:
+```math
+\begin{align*}
+\text{Idx}(\text{Cons}(\text{Head}, \text{Tail}), 0) &= \text{Head} \\
+\text{Idx}(\text{Cons}(\text{Head}, \text{Tail}), S(a)) &= \text{Idx}(\text{Tail}, a) \\
+\end{align*}
+```
+
+This is actually pretty simple, if the index is zero, we just return the first element of `Cons` which is `Head`, otherwise, we call index again on the second element of `Cons` which is another `Cons` with index - 1, we keep repeating that until index becomes 0.
+
+Here's how the rust implementation looks like:
+```rust
+trait GetIndex<Index> {
+    type Output;
+}
+
+// Idx(Cons(Head, Tail), 0) = Head
+impl<H, T> GetIndex<Zero> for Cons<H, T> {
+    type Output = H;
+}
+
+// Idx(Cons(Head, Tail), S(a)) = Idx(Tail, a)
+impl<H, T, Index> GetIndex<Next<Index>> for Cons<H, T>
+where
+    Index: Num,
+    T: GetIndex<Index>,
+{
+    type Output = <T as GetIndex<Index>>::Output;
+}
+```
+
+And we can use it like following:
+```rust
+fn main() {
+    type List = Cons<_2, Cons<_4, Cons<_6, Cons<_8, Nil>>>>;
+
+    assert_eq!(<List as GetIndex<_1>>::Output::VALUE, _4::VALUE);
+    assert_eq!(<List as GetIndex<_2>>::Output::VALUE, _6::VALUE);
+}
+```
+
+> If you've followed along till this point, I think you should try to implement more list operations like push, pop, etc. by yourself as an exercise.
+
+ > ### Append
+This operation will allow us to insert an element at the end of a list, this is as simple as replacing the last `Nil` with `Cons<T, Nil>`
+
+This is going to be our base case:
+```math
+\begin{align*}
+\text{Append}(\text{Nil}, i) &= \text{Cons}(i, \text{Nil})\\
+\text{Append}(\text{Cons(Head, Tail)}, i) &= \text{Cons}(\text{Head}, \text{Append}(\text{Tail}, i)) \\
+\end{align*}
+```
+
+Yeah we just keep appending the item to the tail until we reach `Nil` which is then replaced by `Cons(i, Nil)`
+
+rust implementation:
+```rust
+trait Append<Item> {
+    type Output;
+}
+
+// Append(Nil, i) = Cons(i, Nil)
+impl<Item> Append<Item> for Nil {
+    type Output = Cons<Item, Nil>;
+}
+
+// Append(Cons(Head, Tail), i) = Cons(Head, Append(Tail, i))
+impl<H, T, Item> Append<Item> for Cons<H, T>
+where
+    T: Append<Item>,
+{
+    type Output = Cons<H, <T as Append<Item>>::Output>;
+}
+```
+
+
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
 > - [x] arithmetic
 >   - [x] addition
@@ -644,8 +789,12 @@ where
 >   - [x] multiplication
 > - [x] boolean operations
 > - [x] comparison
-> - [ ] lists
-> - [ ] list operations (append, index, length, remove, etc.)
+> - [x] lists
+> - [ ] list operations
+>   - [x] index
+>   - [x] append
+>   - [ ] remove
+>   - [ ] length
 > - [ ] type level functions
 > - [ ] more list operations (map, filter, etc.)
 > - [ ] macros to make life easier
