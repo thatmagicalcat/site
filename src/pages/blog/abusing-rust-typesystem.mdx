@@ -537,6 +537,70 @@ where
 }
 ```
 
+> ### Less than, Less than or equal to
+We'll define a function `LessThan(a, b) = a < b` similar to `Eq` as:
+```math
+\begin{align*}
+\text{LessThan}(0, 0) &= \text{false} \\
+\text{LessThan}(0, S(a)) &= \text{true} \\
+\text{LessThan}(S(a), 0) &= \text{false} \\
+\text{LessThan}(S(a), S(b)) &= \text{LessThan(a, b)} \\
+\end{align*}
+```
+
+and now our rust implementation
+```rust
+trait PeanoLt<N> {
+    type Output: Boolean;
+}
+
+// LessThan(0, 0) = false
+impl PeanoLt<Zero> for Zero {
+    type Output = False;
+}
+
+// LessThan(0, S(a)) = true
+impl<N: Num> PeanoLt<Next<N>> for Zero {
+    type Output = True;
+}
+
+// LessThan(S(a), 0) = false
+impl<N: Num> PeanoLt<Zero> for Next<N> {
+    type Output = False;
+}
+
+// LessThan(S(a), S(b)) = LessThan(a, b)
+impl<M, N> PeanoLt<Next<M>> for Next<N>
+where
+    N: Num + PeanoLt<M>,
+    M: Num,
+{
+    type Output = <N as PeanoLt<M>>::Output;
+}
+```
+
+And we can use our previous `PeanoEq` implementation to create `PeanoLEq`
+```rust
+trait PeanoLEq<N> {
+    type Output: Boolean;
+}
+
+impl<N, M> PeanoLEq<M> for N
+where
+    N: Num + PeanoLt<M> + PeanoEq<M>,
+    M: Num,
+    <N as PeanoLt<M>>::Output: Or<<N as PeanoEq<M>>::Output>,
+{
+    type Output = <
+        <N as PeanoLt<M>>::Output as
+        Or<
+        <N as PeanoEq<M>>::Output>
+    >::Output;
+}
+```
+
+> ### Greater than, Greater than or equal to
+
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
 > - [x] arithmetic
 >   - [x] addition
