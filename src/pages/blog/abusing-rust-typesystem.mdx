@@ -782,6 +782,51 @@ where
 ```
 
 
+Now I think you get the idea how all this stuff works, so i guess I'll drop the implementations of length and pop.
+
+> ### Length
+
+```rust
+trait Length {
+    type Output;
+}
+
+// Base case: len(Nil) = 0
+impl Length for Nil {
+    type Output = Zero;
+}
+
+// len(Cons(Head, Tail)) = 1 + len(tail)
+impl<H, T> Length for Cons<H, T>
+where
+    T: Length,
+    <T as Length>::Output: Num,
+{
+    type Output = <<T as Length>::Output as PeanoAdd<Next<Zero>>>::Output;
+}
+```
+
+> ### Pop
+
+```rust
+pub trait Pop<Index> {
+    type Output;
+}
+
+impl<H, T> Pop<Zero> for Cons<H, T> {
+    type Output = T;
+}
+
+impl<H, T, Index> Pop<Next<Index>> for Cons<H, T>
+where
+    Index: Num,
+    T: Pop<Index>,
+{
+    type Output = Cons<H, <T as Pop<Index>>::Output>;
+}
+```
+
+
 > **TODO:** This blog post is still a work in progress. More type system tricks and examples coming soon!
 > - [x] arithmetic
 >   - [x] addition
@@ -793,8 +838,8 @@ where
 > - [ ] list operations
 >   - [x] index
 >   - [x] append
->   - [ ] remove
->   - [ ] length
+>   - [x] pop
+>   - [x] length
 > - [ ] type level functions
 > - [ ] more list operations (map, filter, etc.)
 > - [ ] macros to make life easier
